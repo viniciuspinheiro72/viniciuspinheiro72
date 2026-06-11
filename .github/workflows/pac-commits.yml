@@ -1,0 +1,40 @@
+name: pac-commits
+
+on:
+  schedule:
+    - cron: "17 0 * * *"      # daily, 00:17 UTC
+  workflow_dispatch:           # run manually from the Actions tab
+  push:
+    branches: [main]           # also rebuild on push to main
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Generate animated SVGs
+        env:
+          GH_USER: ${{ github.repository_owner }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python generate.py   # writes dist/pac-commits.svg + -dark.svg
+
+      - name: Publish to output branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd dist
+          git init -q
+          git checkout -qb output
+          git add -A
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -qm "pac-commits: update $(date -u +%FT%TZ)"
+          git push -f "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" output
